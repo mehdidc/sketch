@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block body %}
+
+<div><canvas id="sketch" style='border:1px solid black'></canvas><div>
+<script type="text/javascript">
+
+  $(function() {
+    var sketchpad = new Sketchpad({
+      element: '#sketch',
+      width: 28,
+      height: 28,
+      penSize: 2 
+    });
+
+   $('#fill').bind('click', function() {
+      $.getJSON('/fill', {
+          img: document.querySelector('#sketch').toDataURL("image/png")
+      }, function(data) {
+        load_img('sketch', data.img);
+      });
+      return false;
+    });
+
+   $('#create').bind('click', function() {
+      $.getJSON('/create', {
+          img: document.querySelector('#sketch').toDataURL("image/png")
+      }, function(data) {
+        load_img('sketch', data.img);
+      });
+      return false;
+    });
+
+
+  });
+</script>
+
+<a href="#sketch" data-download="png" style="float: right; width: 100px;">Download</a>
+<a href="#" id="fill">Fine-tune</a>
+<a href="#" id="create">Create</a>
+{% endblock %}
