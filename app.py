@@ -4,12 +4,13 @@ import click
 
 from skimage.io import imread, imsave
 from skimage.transform import resize
-from skimage.filter import threshold_otsu
+from skimage.filters import threshold_otsu
 from flask import Flask, request, redirect, render_template, url_for, Response, jsonify
 import base64
 import numpy as np
 
 from machinedesign.autoencoder.interface import load
+from machinedesign.transformers import transform_one, inverse_transform_one
 
 model = load('models/mnist')
 
@@ -46,15 +47,16 @@ def _create(data):
     x = np.random.randint(0, data.shape[3] - size)
     shape = data[:, :, y:y+size, x:x+size].shape
     data[:, :, y:y+size, x:x+size] = np.random.uniform(size=shape) 
-    for i in range(10):
+    for i in range(1):
         data = model.predict(data)
         data = data.astype(np.float32)
     return data
 
 def _fill(data):
-    print(data.min(), data.max(), data.shape)
-    for i in range(10):
+    for i in range(1):
+        data = transform_one(data, model.transformers)
         data = model.predict(data)
+        data = inverse_transform_one(data, model.transformers)
         data = data.astype(np.float32)
     return data
 
@@ -64,22 +66,27 @@ def process_img(img, func):
         d = base64.b64decode(content)
         fd.write(d)
     img = imread('img.png')
-    pad = 2
-    img = img[:, :, 3]
-    try:
-        img = img > threshold_otsu(img)
-    except Exception:
-        pass
-    data = img[None, :, :, None].astype(np.float32)
+    img = resize(img, (28, 28), preserve_range=True)
+    data = img[np.newaxis, :, :, :].astype(np.float32)
     data = data.transpose((0, 3, 1, 2))
+    if model.layers[0].output_shape[1] == 1:
+        data = data[:, 3:4, :, :]
+    else:
+        data = data[:, 0:3, :, :]
+    data /= 255.
     data = func(data)
     data = data.transpose((0, 2, 3, 1))
+
     img = data[0]
-    img = img[:, :, 0]
-    img = img[:, :, None] * np.ones((1, 1, 4))
-    img[:, :, 0:3]=0
-    img = img * 255.
-    img = img.astype(np.uint8)
+    if model.layers[0].output_shape[1] == 1:
+        img = img[:, :, 0]
+        img = img[:, :, None] * np.ones((1, 1, 4))
+        img[:, :, 0:3]=0
+        img = img * 255.
+        img = img.astype(np.uint8)
+    else:
+        pass
+    #img = resize(img, (256, 256))
     imsave('img.png', img)
     data = open('img.png', 'rb').read()
     content = base64.b64encode(data)
